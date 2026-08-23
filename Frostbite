@@ -1,0 +1,401 @@
+local TweenService = game:GetService("TweenService")
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+_G.baseval = 6
+local damages = true
+
+--============================================================
+-- TẠO MODEL
+--============================================================
+
+local model = game:GetObjects("rbxassetid://97541075583681")[1]
+if not model then
+	return
+end
+
+model.Parent = workspace
+
+local mainPart =
+	model.PrimaryPart
+	or model:FindFirstChildWhichIsA("BasePart")
+
+if not mainPart then
+	model:Destroy()
+	return
+end
+
+model.PrimaryPart = mainPart
+
+--============================================================
+-- TÌM ROOM HIỆN TẠI
+--============================================================
+
+local roomsFolder =
+	workspace:FindFirstChild("CurrentRooms")
+	or workspace:WaitForChild("CurrentRooms", 10)
+
+local rooms = {}
+
+if roomsFolder then
+	rooms = roomsFolder:GetChildren()
+end
+
+local room = rooms[#rooms - 1]
+
+--============================================================
+-- ĐẶT MODEL CAO HƠN
+--============================================================
+
+if room and mainPart then
+
+	local floor =
+		room:FindFirstChild("Parts")
+		and room.Parts:FindFirstChild("Floor")
+
+	if floor then
+
+		model:SetPrimaryPartCFrame(
+			floor.CFrame
+			+ Vector3.new(0, 7, 0)
+		)
+
+	else
+
+		model:SetPrimaryPartCFrame(
+			CFrame.new(0, 7, 0)
+		)
+
+	end
+
+elseif mainPart then
+
+	model:SetPrimaryPartCFrame(
+		CFrame.new(0, 7, 0)
+	)
+
+end
+
+--============================================================
+-- LIGHT TWEEN
+--============================================================
+
+local light =
+	model:FindFirstChild("Light", true)
+
+if light
+	and (
+		light:IsA("PointLight")
+		or light:IsA("SpotLight")
+		or light:IsA("SurfaceLight")
+	) then
+
+	light.Range = 0
+
+	local anim =
+		TweenService:Create(
+			light,
+			TweenInfo.new(1),
+			{
+				Range = 21
+			}
+		)
+
+	anim:Play()
+end
+
+--============================================================
+-- DAMAGE SYSTEM
+--============================================================
+
+local DAMAGE_PER_SECOND = 5
+local DAMAGE_DELAY = 5
+
+local LIGHTER_NAMES = {
+	["lighter"] = true,
+	["lightertool"] = true,
+	["lighter tool"] = true,
+	["lighter_tool"] = true,
+}
+
+local playerStates = {}
+
+--============================================================
+-- LIGHTER CHECK
+--============================================================
+
+local function IsLighterOn(player)
+
+	local character =
+		player.Character
+
+	if not character then
+		return false
+	end
+
+	for _, tool in ipairs(
+		character:GetChildren()
+	) do
+
+		if tool:IsA("Tool") then
+
+			local toolName =
+				string.lower(tool.Name)
+
+			if LIGHTER_NAMES[toolName] then
+
+				for _, obj in ipairs(
+					tool:GetDescendants()
+				) do
+
+					if obj:IsA("PointLight")
+						or obj:IsA("SpotLight")
+						or obj:IsA("SurfaceLight") then
+
+						return obj.Enabled
+					end
+
+				end
+
+				-- Không có Light bên trong:
+				-- coi tool đang được equip là bật
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+--============================================================
+-- DAMAGE
+--============================================================
+
+local function DamagePlayer(player)
+
+	local character =
+		player.Character
+
+	if not character then
+		return
+	end
+
+	local humanoid =
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	if not humanoid
+		or humanoid.Health <= 0 then
+		return
+	end
+
+	humanoid.Health =
+		math.max(
+			0,
+			humanoid.Health - DAMAGE_PER_SECOND
+		)
+
+end
+
+--============================================================
+-- RESET PLAYER
+--============================================================
+
+local function ResetPlayer(player)
+
+	playerStates[player] = {
+
+		Delay = DAMAGE_DELAY,
+
+		DamageTimer = 0,
+
+		Active = false
+
+	}
+
+end
+
+for _, player in ipairs(
+	game:GetService("Players"):GetPlayers()
+) do
+
+	ResetPlayer(player)
+
+end
+
+game:GetService("Players").PlayerAdded:Connect(
+	function(player)
+
+		ResetPlayer(player)
+
+		player.CharacterAdded:Connect(
+			function()
+				ResetPlayer(player)
+			end
+		)
+
+	end
+)
+
+game:GetService("Players").PlayerRemoving:Connect(
+	function(player)
+
+		playerStates[player] = nil
+
+	end
+)
+
+--============================================================
+-- DAMAGE LOOP
+--============================================================
+
+task.spawn(function()
+
+	while damages do
+
+		task.wait(0.1)
+
+		for _, player in ipairs(
+			game:GetService("Players"):GetPlayers()
+		) do
+
+			local state =
+				playerStates[player]
+
+			if not state then
+
+				ResetPlayer(player)
+
+				state =
+					playerStates[player]
+
+			end
+
+			local character =
+				player.Character
+
+			if not character then
+				continue
+			end
+
+			local humanoid =
+				character:FindFirstChildOfClass(
+					"Humanoid"
+				)
+
+			if not humanoid
+				or humanoid.Health <= 0 then
+				continue
+			end
+
+			--================================================
+			-- LIGHTER BẬT
+			--================================================
+
+			if IsLighterOn(player) then
+
+				state.Delay =
+					DAMAGE_DELAY
+
+				state.DamageTimer =
+					0
+
+				state.Active =
+					false
+
+				continue
+			end
+
+			--================================================
+			-- CHỜ 5 GIÂY
+			--================================================
+
+			if not state.Active then
+
+				state.Delay -= 0.1
+
+				if state.Delay > 0 then
+					continue
+				end
+
+				state.Delay =
+					0
+
+				state.Active =
+					true
+
+				state.DamageTimer =
+					0
+			end
+
+			--================================================
+			-- 5 HP MỖI GIÂY
+			--================================================
+
+			state.DamageTimer += 0.1
+
+			if state.DamageTimer >= 1 then
+
+				state.DamageTimer -= 1
+
+				DamagePlayer(player)
+
+			end
+
+		end
+
+	end
+
+end)
+
+--============================================================
+-- CLEANUP KHI SANG ROOM MỚI
+--============================================================
+
+local currentRooms =
+	workspace:FindFirstChild("CurrentRooms")
+	or workspace:WaitForChild(
+		"CurrentRooms",
+		10
+	)
+
+if currentRooms then
+
+	currentRooms.ChildAdded:Connect(
+		function()
+
+			damages = false
+
+			_G.baseval = -2
+
+			task.wait(2)
+
+			if model
+				and model.Parent then
+
+				model:Destroy()
+
+			end
+
+		end
+	)
+
+else
+
+	task.delay(20, function()
+
+		damages = false
+
+		_G.baseval = -2
+
+		if model
+			and model.Parent then
+
+			model:Destroy()
+
+		end
+
+	end)
+
+end
