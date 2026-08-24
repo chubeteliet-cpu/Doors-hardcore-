@@ -1,0 +1,483 @@
+--============================================================
+-- DEER GOD - FULL
+-- Không ColorCorrection
+-- Không Rebound
+-- Tự biến mất sau 30 giây
+--============================================================
+
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+if not RunService:IsServer() then
+	warn("Chạy trên client? Script này nên chạy server-side.")
+end
+
+--============================================================
+-- LOAD ENTITY SPAWNER
+--============================================================
+
+local okSpawner, spawner = pcall(function()
+
+	return loadstring(game:HttpGet(
+		"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"
+	))()
+
+end)
+
+if not okSpawner or not spawner then
+	warn(
+		"[DEER GOD] Không load được Entity Spawner:",
+		spawner
+	)
+	return
+end
+
+--============================================================
+-- GITHUB MP3
+--============================================================
+
+local SOUND_URL =
+	"https://raw.githubusercontent.com/chubeteliet-cpu/Doors-hardcore-/refs/heads/main/Deer%20god%20.mp3"
+
+local function getGitSoundId(url, name)
+
+	local ok, res = pcall(function()
+
+		local fileName =
+			name .. ".mp3"
+
+		if not isfile(fileName) then
+
+			local data =
+				game:HttpGet(url)
+
+			if not data or #data == 0 then
+				error("MP3 tải về rỗng.")
+			end
+
+			writefile(
+				fileName,
+				data
+			)
+		end
+
+		return getcustomasset(fileName)
+
+	end)
+
+	if ok and res then
+		return res
+	end
+
+	warn(
+		"[DEER GOD] Không tải được MP3:",
+		tostring(res)
+	)
+
+	return nil
+end
+
+--============================================================
+-- PLAY SOUND
+--============================================================
+
+local sound =
+	Instance.new("Sound")
+
+sound.Name =
+	"DeerGodMusic"
+
+local loadedId =
+	getGitSoundId(
+		SOUND_URL,
+		"deer_god_music"
+	)
+
+if loadedId then
+
+	sound.SoundId =
+		loadedId
+
+end
+
+sound.Volume =
+	4
+
+sound.Looped =
+	false
+
+sound.PlaybackSpeed =
+	1
+
+sound.Parent =
+	Workspace
+
+if sound.SoundId ~= "" then
+
+	pcall(function()
+		sound:Play()
+	end)
+
+	sound.Ended:Connect(function()
+
+		if sound.Parent then
+			sound:Destroy()
+		end
+
+	end)
+
+end
+
+--============================================================
+-- RANDOM
+--============================================================
+
+math.randomseed(
+	math.floor(
+		os.clock() * 1000000
+	)
+)
+
+local randSpeed =
+	math.random(50, 90)
+
+local randDelay =
+	math.random(1, 3)
+
+local randHeight =
+	math.random(-2, 2)
+
+--============================================================
+-- CREATE ENTITY
+--============================================================
+
+local okCreate, result =
+	pcall(function()
+
+		return spawner.Create({
+
+			Entity = {
+
+				Name =
+					"deer god",
+
+				Asset =
+					"rbxassetid://16092643532",
+
+				HeightOffset =
+					randHeight
+			},
+
+			Lights = {
+
+				Flicker = {
+
+					Enabled =
+						true,
+
+					Duration =
+						14
+				},
+
+				Shatter =
+					true,
+
+				Repair =
+					false
+			},
+
+			CameraShake = {
+
+				Enabled =
+					false,
+
+				Range =
+					0,
+
+				Values = {
+					0,
+					0,
+					0,
+					0
+				}
+			},
+
+			Movement = {
+
+				Speed =
+					25,
+
+				Delay =
+					randDelay,
+
+				Reversed =
+					false
+			},
+
+			--================================================
+			-- NO REBOUND
+			--================================================
+
+			Rebounding = {
+
+				Enabled =
+					false,
+
+				Type =
+					"Ambush",
+
+				Min =
+					0,
+
+				Max =
+					0,
+
+				Delay =
+					0
+			},
+
+			Damage = {
+
+				Enabled =
+					true,
+
+				Range =
+					50,
+
+				Amount =
+					9999
+			},
+
+			Crucifixion = {
+
+				Enabled =
+					false,
+
+				Range =
+					0,
+
+				Resist =
+					false,
+
+				Break =
+					false
+			},
+
+			Death = {
+
+				Type =
+					"Guiding",
+
+				Hints = {
+					""
+				},
+
+				Cause =
+					"deer god"
+			}
+		})
+
+	end)
+
+if not okCreate or not result then
+
+	warn(
+		"[DEER GOD] Không tạo được entity:",
+		result
+	)
+
+	return
+end
+
+local entity =
+	result
+
+--============================================================
+-- DAMAGE CALLBACK
+--============================================================
+
+pcall(function()
+
+	entity:SetCallback(
+		"OnDamagePlayer",
+		function(player)
+
+			if typeof(player)
+				~= "Instance" then
+				return
+			end
+
+			if not player:IsA("Player") then
+				return
+			end
+
+			pcall(function()
+
+				local gameStats =
+					ReplicatedStorage:
+					FindFirstChild(
+						"GameStats"
+					)
+
+				if not gameStats then
+					return
+				end
+
+				local stats =
+					gameStats:
+					FindFirstChild(
+						"Player_"
+						.. player.Name
+					)
+
+				if not stats then
+					return
+				end
+
+				local total =
+					stats:
+					FindFirstChild(
+						"Total"
+					)
+
+				if not total then
+					return
+				end
+
+				local deathCause =
+					total:
+					FindFirstChild(
+						"DeathCause"
+					)
+
+				if deathCause then
+					deathCause.Value =
+						"deer god"
+				end
+
+			end)
+
+		end
+	)
+
+end)
+
+--============================================================
+-- RUN ENTITY
+--============================================================
+
+local okRun, runError =
+	pcall(function()
+
+		entity:Run()
+
+	end)
+
+if not okRun then
+
+	warn(
+		"[DEER GOD] entity:Run() lỗi:",
+		runError
+	)
+
+	return
+end
+
+print(
+	"[DEER GOD] Entity đã spawn."
+)
+
+--============================================================
+-- FIND ENTITY
+--============================================================
+
+local function FindDeerGod()
+
+	for i = 1, 100 do
+
+		local model =
+			Workspace:
+			FindFirstChild(
+				"deer god",
+				true
+			)
+
+		if model then
+			return model
+		end
+
+		task.wait(0.1)
+
+	end
+
+	return nil
+end
+
+local deerModel =
+	FindDeerGod()
+
+--============================================================
+-- REMOVE AFTER 30 SECONDS
+--============================================================
+
+task.delay(
+	30,
+	function()
+
+		print(
+			"[DEER GOD] 30 giây -> xóa entity."
+		)
+
+		-- Xóa model đã tìm
+		if deerModel
+			and deerModel.Parent then
+
+			pcall(function()
+				deerModel:Destroy()
+			end)
+
+		end
+
+		-- Backup scan
+		for _, obj in ipairs(
+			Workspace:GetDescendants()
+		) do
+
+			if obj:IsA("Model") then
+
+				local name =
+					string.lower(
+						obj.Name
+					)
+
+				if name == "deer god"
+					or name:find(
+						"deer god",
+						1,
+						true
+					) then
+
+					pcall(function()
+						obj:Destroy()
+					end)
+
+				end
+			end
+		end
+
+		print(
+			"[DEER GOD] Entity removed."
+		)
+
+	end
+)
+
+print("==================================================")
+print(" DEER GOD LOADED")
+print(" COLOR CORRECTION: OFF")
+print(" REBOUND: OFF")
+print(" SPEED: 17")
+print(" DAMAGE: 9999")
+print(" AUTO REMOVE: 30 SECONDS")
+print("==================================================")
