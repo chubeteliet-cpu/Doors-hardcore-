@@ -1,0 +1,298 @@
+--==================================================
+-- SERVICES
+--==================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+--==================================================
+-- PLAYER + SPEED CONFIG
+--==================================================
+local player = Players.LocalPlayer
+local speedBoostValue = 5
+local normalSpeed = 15
+
+--==================================================
+-- STAMINA CONFIG
+--==================================================
+local maxStamina = 100
+local stamina = maxStamina
+local staminaDrain = 10
+local staminaRegen = 20
+
+--==================================================
+-- STATE
+--==================================================
+local sprintActive = false
+local humanoid
+
+--==================================================
+-- STAMINA GUI
+--==================================================
+local staminaGui = Instance.new("ScreenGui")
+staminaGui.Name = "StaminaGui"
+staminaGui.ResetOnSpawn = false
+staminaGui.Parent = player:WaitForChild("PlayerGui")
+
+local barBackground = Instance.new("Frame")
+barBackground.Name = "StaminaBar"
+barBackground.Parent = staminaGui
+barBackground.Size = UDim2.new(0, 260, 0, 20)
+barBackground.Position = UDim2.new(0.5, -130, 0.9, 0)
+barBackground.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+barBackground.BorderSizePixel = 0
+barBackground.Visible = false
+
+local barCorner = Instance.new("UICorner")
+barCorner.CornerRadius = UDim.new(0, 10)
+barCorner.Parent = barBackground
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(60, 60, 60)
+stroke.Thickness = 1
+stroke.Parent = barBackground
+
+--==================================================
+-- STAMINA FILL
+-- RGB: 245, 240, 240
+--==================================================
+local barFill = Instance.new("Frame")
+barFill.Name = "Fill"
+barFill.Parent = barBackground
+barFill.Size = UDim2.new(1, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(245, 240, 240)
+barFill.BorderSizePixel = 0
+barFill.ZIndex = 2
+
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(0, 10)
+fillCorner.Parent = barFill
+
+--==================================================
+-- STAMINA TEXT
+--==================================================
+local staminaText = Instance.new("TextLabel")
+staminaText.Parent = barBackground
+staminaText.Size = UDim2.new(1, 0, 1, 0)
+staminaText.BackgroundTransparency = 1
+staminaText.Text = "100%"
+staminaText.TextColor3 = Color3.fromRGB(255, 255, 255)
+staminaText.Font = Enum.Font.GothamBold
+staminaText.TextSize = 14
+staminaText.ZIndex = 3
+staminaText.TextStrokeTransparency = 0.4
+
+--==================================================
+-- CUSTOM SPRINT BUTTON
+-- IMAGE ID: 89076979252444
+--==================================================
+local sprintGui = Instance.new("ScreenGui")
+sprintGui.Name = "SprintGui"
+sprintGui.ResetOnSpawn = false
+sprintGui.Parent = player:WaitForChild("PlayerGui")
+
+local sprintButton = Instance.new("ImageButton")
+sprintButton.Name = "SprintButton"
+sprintButton.Parent = sprintGui
+
+sprintButton.Size = UDim2.new(0, 85, 0, 85)
+sprintButton.Position = UDim2.new(1, -115, 1, -190)
+
+sprintButton.Image = "rbxassetid://89076979252444"
+sprintButton.BackgroundTransparency = 1
+sprintButton.BorderSizePixel = 0
+sprintButton.AutoButtonColor = false
+
+local aspect = Instance.new("UIAspectRatioConstraint")
+aspect.AspectRatio = 1
+aspect.Parent = sprintButton
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(1, 0)
+buttonCorner.Parent = sprintButton
+
+local buttonStroke = Instance.new("UIStroke")
+buttonStroke.Color = Color3.fromRGB(255, 255, 255)
+buttonStroke.Thickness = 1
+buttonStroke.Transparency = 0.35
+buttonStroke.Parent = sprintButton
+
+--==================================================
+-- CHARACTER + SPEED BOOST ICON
+--==================================================
+local function setupCharacter(character)
+	humanoid = character:WaitForChild("Humanoid")
+
+	local gui = player:WaitForChild("PlayerGui")
+
+	local speedBoostIcon
+
+	pcall(function()
+		speedBoostIcon =
+			gui.MainUI.MainFrame.Healthbar.Effects.SpeedBoost
+	end)
+
+	local function checkBoost()
+		if not speedBoostIcon then
+			return
+		end
+
+		if not sprintActive or humanoid.Health <= 0 then
+			speedBoostIcon.Visible = false
+			return
+		end
+
+		if humanoid.WalkSpeed == normalSpeed then
+			humanoid.WalkSpeed = normalSpeed + speedBoostValue
+			speedBoostIcon.Visible = true
+
+		elseif humanoid.WalkSpeed == normalSpeed + speedBoostValue then
+			speedBoostIcon.Visible = true
+
+		else
+			speedBoostIcon.Visible = false
+		end
+	end
+
+	humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(checkBoost)
+	humanoid:GetPropertyChangedSignal("Health"):Connect(checkBoost)
+
+	humanoid.Died:Connect(function()
+		sprintActive = false
+
+		if speedBoostIcon then
+			speedBoostIcon.Visible = false
+		end
+
+		if humanoid then
+			humanoid.WalkSpeed = normalSpeed
+		end
+
+		barBackground.Visible = false
+	end)
+
+	humanoid.WalkSpeed = normalSpeed
+	checkBoost()
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+
+if player.Character then
+	setupCharacter(player.Character)
+end
+
+--==================================================
+-- SPRINT TOGGLE
+--==================================================
+local function toggleSprint()
+	if not humanoid then
+		return
+	end
+
+	if humanoid.Health <= 0 then
+		return
+	end
+
+	if sprintActive then
+
+		-- TẮT CHẠY
+		sprintActive = false
+		humanoid.WalkSpeed = normalSpeed
+
+	else
+
+		-- BẬT CHẠY
+		if stamina > 0 then
+			sprintActive = true
+			humanoid.WalkSpeed = normalSpeed + speedBoostValue
+		end
+
+	end
+end
+
+--==================================================
+-- MOBILE BUTTON
+--==================================================
+sprintButton.MouseButton1Click:Connect(function()
+	toggleSprint()
+end)
+
+--==================================================
+-- PC SHIFT
+--==================================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.LeftShift then
+		toggleSprint()
+	end
+end)
+
+--==================================================
+-- STAMINA + UI
+--==================================================
+RunService.RenderStepped:Connect(function(dt)
+
+	if not humanoid then
+		return
+	end
+
+	if humanoid.Health <= 0 then
+		return
+	end
+
+	local isMoving =
+		humanoid.MoveDirection.Magnitude > 0
+
+	--================================================
+	-- ĐANG CHẠY + DI CHUYỂN
+	--================================================
+	if sprintActive and isMoving then
+
+		humanoid.WalkSpeed =
+			normalSpeed + speedBoostValue
+
+		stamina -= staminaDrain * dt
+
+		if stamina <= 0 then
+			stamina = 0
+			sprintActive = false
+			humanoid.WalkSpeed = normalSpeed
+		end
+
+	else
+
+		--================================================
+		-- HỒI STAMINA
+		--================================================
+		stamina += staminaRegen * dt
+
+		if stamina > maxStamina then
+			stamina = maxStamina
+		end
+
+	end
+
+	--================================================
+	-- UPDATE STAMINA BAR
+	--================================================
+	local percent = stamina / maxStamina
+
+	barFill.Size =
+		UDim2.new(percent, 0, 1, 0)
+
+	staminaText.Text =
+		math.floor(percent * 100) .. "%"
+
+	--================================================
+	-- ẨN / HIỆN STAMINA
+	--================================================
+	if sprintActive and stamina < maxStamina then
+		barBackground.Visible = true
+	else
+		barBackground.Visible = false
+	end
+
+end)
