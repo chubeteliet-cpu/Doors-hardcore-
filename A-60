@@ -1,0 +1,118 @@
+local spawner = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"
+))()
+
+local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--==================================================
+-- SOUND
+--==================================================
+
+local sound = Instance.new("Sound")
+sound.Name = "A-60"
+sound.SoundId = "rbxassetid://101395573137763"
+sound.Volume = 1
+sound.Looped = false
+sound.Parent = SoundService
+
+--==================================================
+-- ENTITY
+--==================================================
+
+local entity = spawner.Create({
+    Entity = {
+        Name = "A-60",
+        Asset = "rbxassetid://12263106166",
+        HeightOffset = 0
+    },
+
+    Lights = {
+        Flicker = {
+            Enabled = false,
+            Duration = 9
+        },
+        Shatter = true,
+        Repair = false
+    },
+
+    CameraShake = {
+        Enabled = true,
+        Range = 100,
+        Values = {2, 25, 0.1, 1}
+    },
+
+    Movement = {
+        Speed = 345,
+        Delay = 9,
+        Reversed = false
+    },
+
+    Rebounding = {
+        Enabled = true,
+        Type = "Ambush",
+        Min = 3,
+        Max = 4,
+        Delay = 1
+    },
+
+    Damage = {
+        Enabled = true,
+        Range = 50,
+        Amount = 9999
+    },
+
+    Crucifixion = {
+        Enabled = false,
+        Range = 40,
+        Resist = false,
+        Break = true
+    },
+
+    Death = {
+        Type = "Guiding",
+        Hints = {},
+        Cause = "A-60"
+    }
+})
+
+--==================================================
+-- DEATH CALLBACK
+--==================================================
+
+entity:SetCallback("OnDamagePlayer", function(newHealth)
+    local Plr = Players.LocalPlayer
+    local GameStats = ReplicatedStorage:FindFirstChild("GameStats")
+
+    if GameStats then
+        local PlayerStats = GameStats:FindFirstChild("Player_" .. Plr.Name)
+
+        if PlayerStats
+        and PlayerStats:FindFirstChild("Total")
+        and PlayerStats.Total:FindFirstChild("DeathCause") then
+            PlayerStats.Total.DeathCause.Value = "A-60"
+        end
+    end
+end)
+
+--==================================================
+-- RUN ENTITY
+--==================================================
+
+entity:Run()
+
+--==================================================
+-- PLAY SOUND AFTER 10 SECONDS
+--==================================================
+
+task.delay(10, function()
+    if sound and sound.Parent then
+        sound:Play()
+    end
+end)
+
+-- Xóa sound khi phát xong
+sound.Ended:Connect(function()
+    sound:Destroy()
+end)
