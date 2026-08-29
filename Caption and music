@@ -1,0 +1,18 @@
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("mode by Noonie & Ping remake by bac minh", true)
+
+local url = "https://raw.githubusercontent.com/chubeteliet-cpu/Doors-hardcore-/main/the%20beginning%20of%20the%20end.mp3"
+local fileName = "the_beginning_of_the_end.mp3"
+
+if not isfile(fileName) then
+	writefile(fileName, game:HttpGet(url))
+end
+
+local sound = Instance.new("Sound")
+sound.Name = "HardcoreIntro"
+sound.SoundId = (getcustomasset or getsynasset)(fileName)
+sound.Volume = 1
+sound.Looped = false
+sound.Parent = workspace
+sound:Play()
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
