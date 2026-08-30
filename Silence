@@ -1,202 +1,110 @@
---============================================================
--- SILENCE — FULL
---============================================================
--- Execute:
--- 1. Nhạc GitHub phát ngay
--- 2. Bóng đèn tắt/bể
--- 3. Chờ 2 giây
--- 4. Silence spawn
---============================================================
-
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
---============================================================
--- EXECUTOR CHECK
---============================================================
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local entityName = "silence"
+local entityAsset = "rbxassetid://16167850268"
+
+local musicUrl = "https://raw.githubusercontent.com/binhxd30-eng/Light-break/main/Light%20broken.mp3"
+local musicFile = "silence_music.mp3"
+
+local waitTime = 2
 
 if not game.HttpGet then
-	warn("[SILENCE] Executor không hỗ trợ HttpGet.")
+	warn("[SILENCE] HttpGet is not supported.")
 	return
 end
 
 if not isfile or not writefile or not getcustomasset then
-	warn("[SILENCE] Executor cần isfile / writefile / getcustomasset.")
+	warn("[SILENCE] isfile, writefile or getcustomasset is missing.")
 	return
 end
 
---============================================================
--- SETTINGS
---============================================================
+math.randomseed(math.floor(os.clock() * 1000000))
 
-local ENTITY_NAME = "silence"
-local ENTITY_ASSET = "rbxassetid://16167850268"
+local height = math.random(-2, 2)
+local reboundMin = math.random(2, 4)
+local reboundMax = reboundMin + math.random(1, 3)
 
-local MUSIC_URL =
-	"https://raw.githubusercontent.com/binhxd30-eng/Light-break/main/Light%20broken.mp3"
-
-local MUSIC_FILE = "silence_music.mp3"
-
-local LIGHT_WAIT = 2
-
---============================================================
--- RANDOM
---============================================================
-
-math.randomseed(
-	math.floor(os.clock() * 1000000)
-)
-
-local randHeight = math.random(-2, 2)
-
-local randReboundMin =
-	math.random(2, 4)
-
-local randReboundMax =
-	randReboundMin + math.random(1, 3)
-
---============================================================
--- MUSIC — PHÁT NGAY KHI EXECUTE
---============================================================
-
-local function PlayMusicImmediately()
-
-	local downloaded = false
-
-	-- Tải MP3
-	if not isfile(MUSIC_FILE) then
-
+local function playMusic()
+	if not isfile(musicFile) then
 		local success, data = pcall(function()
-			return game:HttpGet(MUSIC_URL)
+			return game:HttpGet(musicUrl)
 		end)
 
-		if success and data and #data > 0 then
-
-			local writeSuccess = pcall(function()
-				writefile(MUSIC_FILE, data)
-			end)
-
-			if writeSuccess then
-				downloaded = true
-			end
-
+		if not success or not data or #data == 0 then
+			warn("[SILENCE] Failed to download music.")
+			return
 		end
 
-	else
+		local saved = pcall(function()
+			writefile(musicFile, data)
+		end)
 
-		downloaded = true
-
+		if not saved then
+			warn("[SILENCE] Failed to save music.")
+			return
+		end
 	end
 
-	if not downloaded then
-		warn("[SILENCE] Không tải được MP3.")
-		return
+	local old = SoundService:FindFirstChild("SilenceMusic")
+
+	if old then
+		old:Destroy()
 	end
 
 	local success, result = pcall(function()
-
-		local oldSound =
-			SoundService:FindFirstChild("SilenceMusic")
-
-		if oldSound then
-			oldSound:Destroy()
-		end
-
 		local sound = Instance.new("Sound")
 
 		sound.Name = "SilenceMusic"
-
-		sound.SoundId =
-			getcustomasset(MUSIC_FILE)
-
+		sound.SoundId = getcustomasset(musicFile)
 		sound.Volume = 5
-
 		sound.Looped = false
-
-		sound.Parent =
-			SoundService
+		sound.Parent = SoundService
 
 		sound:Play()
 
 		sound.Ended:Connect(function()
-
-			pcall(function()
+			if sound then
 				sound:Destroy()
-			end)
-
+			end
 		end)
 
 		return sound
-
 	end)
 
 	if not success then
-
-		warn(
-			"[SILENCE] Không phát được nhạc:",
-			result
-		)
-
-	else
-
-		print("[SILENCE] Music started.")
-
+		warn("[SILENCE] Music error:", result)
 	end
-
 end
 
--- PHÁT NGAY
-PlayMusicImmediately()
+playMusic()
 
---============================================================
--- LIGHTING
---============================================================
+local function getColorCorrection()
+	local effect = Lighting:FindFirstChild("MainColorCorrection")
 
-local function EnsureMainColorCorrection()
-
-	local cc =
-		Lighting:FindFirstChild(
-			"MainColorCorrection"
-		)
-
-	if not cc then
-
-		cc =
-			Instance.new(
-				"ColorCorrectionEffect"
-			)
-
-		cc.Name =
-			"MainColorCorrection"
-
-		cc.Parent =
-			Lighting
-
+	if not effect then
+		effect = Instance.new("ColorCorrectionEffect")
+		effect.Name = "MainColorCorrection"
+		effect.Parent = Lighting
 	end
 
-	return cc
+	return effect
 end
 
-local cc =
-	EnsureMainColorCorrection()
+local colorCorrection = getColorCorrection()
 
-cc.TintColor =
-	Color3.fromRGB(
-		0,
-		0,
-		255
-	)
-
-cc.Contrast = 1
+colorCorrection.TintColor = Color3.fromRGB(0, 0, 255)
+colorCorrection.Contrast = 1
 
 pcall(function()
-
 	TweenService:Create(
-		cc,
+		colorCorrection,
 		TweenInfo.new(2.5),
 		{
 			Contrast = 0
@@ -204,360 +112,150 @@ pcall(function()
 	):Play()
 
 	TweenService:Create(
-		cc,
+		colorCorrection,
 		TweenInfo.new(80),
 		{
-			TintColor =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
+			TintColor = Color3.fromRGB(255, 255, 255)
 		}
 	):Play()
-
 end)
 
---============================================================
--- LOAD ENTITY SPAWNER
---============================================================
-
-local spawnerSource
-
-local sourceSuccess, sourceResult =
-	pcall(function()
-
-		return game:HttpGet(
-			"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"
-		)
-
-	end)
-
-if not sourceSuccess or not sourceResult then
-
-	warn(
-		"[SILENCE] Không tải được Entity Spawner:",
-		sourceResult
+local sourceSuccess, source = pcall(function()
+	return game:HttpGet(
+		"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"
 	)
+end)
 
+if not sourceSuccess or not source then
+	warn("[SILENCE] Failed to load Entity Spawner.")
 	return
 end
 
-local spawner
+local loadSuccess, spawner = pcall(function()
+	return loadstring(source)()
+end)
 
-local spawnerSuccess, spawnerResult =
-	pcall(function()
-
-		return loadstring(sourceResult)()
-
-	end)
-
-if not spawnerSuccess or not spawnerResult then
-
-	warn(
-		"[SILENCE] Không load được Entity Spawner:",
-		spawnerResult
-	)
-
+if not loadSuccess or not spawner then
+	warn("[SILENCE] Failed to initialize Entity Spawner.")
 	return
 end
 
-spawner =
-	spawnerResult
+local createSuccess, entity = pcall(function()
+	return spawner.Create({
+		Entity = {
+			Name = entityName,
+			Asset = entityAsset,
+			HeightOffset = height
+		},
 
---============================================================
--- CREATE SILENCE
---============================================================
-
-local entity
-
-local createSuccess, createResult =
-	pcall(function()
-
-		return spawner.Create({
-
-			Entity = {
-
-				Name = ENTITY_NAME,
-
-				Asset = ENTITY_ASSET,
-
-				HeightOffset =
-					randHeight
-			},
-
-			Lights = {
-
-				Flicker = {
-
-					Enabled = false,
-
-					Duration = 5
-				},
-
-				Shatter = false,
-
-				Repair = false
-			},
-
-			CameraShake = {
-
-				Enabled = true,
-
-				Range = 100,
-
-				Values = {
-					2,
-					25,
-					0.1,
-					1
-				}
-			},
-
-			Movement = {
-
-				Speed = 50,
-
-				Delay = 6,
-
-				Reversed = false
-			},
-
-			Rebounding = {
-
+		Lights = {
+			Flicker = {
 				Enabled = false,
-
-				Type = "Ambush",
-
-				Min =
-					randReboundMin,
-
-				Max =
-					randReboundMax,
-
-				Delay = 2
+				Duration = 5
 			},
 
-			Damage = {
+			Shatter = false,
+			Repair = false
+		},
 
-				Enabled = true,
+		CameraShake = {
+			Enabled = true,
+			Range = 100,
 
-				Range = 50,
-
-				Amount = 9999
-			},
-
-			Crucifixion = {
-
-				Enabled = true,
-
-				Range = 40,
-
-				Resist = true,
-
-				Break = true
-			},
-
-			Death = {
-
-				Type = "Guiding",
-
-				Hints = {
-					""
-				},
-
-				Cause =
-					ENTITY_NAME
+			Values = {
+				2,
+				25,
+				0.1,
+				1
 			}
+		},
 
-		})
+		Movement = {
+			Speed = 50,
+			Delay = 6,
+			Reversed = false
+		},
 
-	end)
+		Rebounding = {
+			Enabled = false,
+			Type = "Ambush",
+			Min = reboundMin,
+			Max = reboundMax,
+			Delay = 2
+		},
 
-if not createSuccess or not createResult then
+		Damage = {
+			Enabled = true,
+			Range = 50,
+			Amount = 9999
+		},
 
-	warn(
-		"[SILENCE] Không tạo được entity:",
-		createResult
-	)
+		Crucifixion = {
+			Enabled = true,
+			Range = 40,
+			Resist = true,
+			Break = true
+		},
 
+		Death = {
+			Type = "Guiding",
+			Hints = {
+				""
+			},
+			Cause = entityName
+		}
+	})
+end)
+
+if not createSuccess or not entity then
+	warn("[SILENCE] Failed to create entity:", entity)
 	return
 end
 
-entity =
-	createResult
+entity:SetCallback("OnDamagePlayer", function(targetPlayer)
+	if typeof(targetPlayer) ~= "Instance" or not targetPlayer:IsA("Player") then
+		return
+	end
 
---============================================================
--- DAMAGE CALLBACK
---============================================================
+	pcall(function()
+		local gameStats = ReplicatedStorage:FindFirstChild("GameStats")
 
-entity:SetCallback(
-	"OnDamagePlayer",
-	function(player, newHealth)
-
-		if typeof(player) ~= "Instance"
-			or not player:IsA("Player") then
+		if not gameStats then
 			return
 		end
 
-		pcall(function()
+		local stats = gameStats:FindFirstChild("Player_" .. targetPlayer.Name)
 
-			local gameStats =
-				ReplicatedStorage:FindFirstChild(
-					"GameStats"
-				)
-
-			if not gameStats then
-				return
-			end
-
-			local stats =
-				gameStats:FindFirstChild(
-					"Player_" ..
-					player.Name
-				)
-
-			if not stats then
-				return
-			end
-
-			local total =
-				stats:FindFirstChild(
-					"Total"
-				)
-
-			if not total then
-				return
-			end
-
-			local deathCause =
-				total:FindFirstChild(
-					"DeathCause"
-				)
-
-			if deathCause then
-
-				deathCause.Value =
-					ENTITY_NAME
-
-			end
-
-		end)
-
-	end
-)
-
---============================================================
--- BREAK LIGHTS
---============================================================
-
-local function BreakLights()
-
-	for _, obj in ipairs(
-		workspace:GetDescendants()
-	) do
-
-		-- Tắt Light
-		if obj:IsA("PointLight")
-			or obj:IsA("SpotLight")
-			or obj:IsA("SurfaceLight") then
-
-			pcall(function()
-
-				obj.Enabled = false
-
-			end)
-
+		if not stats then
+			return
 		end
 
-		-- Làm bóng đèn biến mất
-		if obj:IsA("BasePart") then
+		local total = stats:FindFirstChild("Total")
 
-			local name =
-				string.lower(
-					obj.Name
-				)
-
-			if name:find(
-				"light",
-				1,
-				true
-			)
-			or name:find(
-				"bulb",
-				1,
-				true
-			)
-			or name:find(
-				"lamp",
-				1,
-				true
-			) then
-
-				pcall(function()
-
-					obj.Transparency = 1
-
-					obj.CanCollide = false
-
-					obj.CanTouch = false
-
-					obj.CanQuery = false
-
-				end)
-
-			end
-
+		if not total then
+			return
 		end
-	end
 
-	print("[SILENCE] Lights broken.")
+		local deathCause = total:FindFirstChild("DeathCause")
 
-end
-
---============================================================
--- BREAK LIGHTS
---============================================================
-
-BreakLights()
-
---============================================================
--- WAIT 2 SECONDS
---============================================================
-
-task.wait(LIGHT_WAIT)
-
---============================================================
--- RUN ENTITY
---============================================================
-
-print("[SILENCE] Spawning entity...")
-
-local runSuccess, runError =
-	pcall(function()
-
-		entity:Run()
-
+		if deathCause then
+			deathCause.Value = entityName
+		end
 	end)
+end)
+
+task.wait(waitTime)
+
+local runSuccess, runError = pcall(function()
+	entity:Run()
+end)
 
 if not runSuccess then
-
-	warn(
-		"[SILENCE] entity:Run() lỗi:",
-		runError
-	)
-
+	warn("[SILENCE] Failed to run entity:", runError)
 	return
 end
 
---============================================================
--- DONE
---============================================================
-
-print("==================================================")
-print(" SILENCE")
-print(" MUSIC: PLAYED IMMEDIATELY")
-print(" LIGHTS: BROKEN")
-print(" WAIT:", LIGHT_WAIT, "SECONDS")
-print(" ENTITY: SPAWNED")
-print("==================================================")
+print("[SILENCE] Music started.")
+print("[SILENCE] Lights untouched.")
+print("[SILENCE] Waiting:", waitTime, "seconds.")
+print("[SILENCE] Entity spawned.")
