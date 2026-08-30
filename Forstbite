@@ -1,0 +1,445 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local GameData = ReplicatedStorage:WaitForChild("GameData")
+local LatestRoom = GameData:WaitForChild("LatestRoom")
+
+LatestRoom.Changed:Wait()
+
+local MODEL_ID = "rbxassetid://16452134189"
+
+local DAMAGE_START_DELAY = 5
+local COLD_DRAIN_RATE = 0.05
+local DAMAGE_PER_SECOND = 5
+
+local success, result = pcall(function()
+	return game:GetObjects(MODEL_ID)[1]
+end)
+
+if not success or not result then
+	warn("Frostbite model could not be loaded.")
+	return
+end
+
+local modelTemplate = result
+
+local frost = Instance.new("ColorCorrectionEffect")
+frost.Name = "FrostbiteEffect"
+frost.TintColor = Color3.fromRGB(255, 255, 255)
+frost.Saturation = 0
+frost.Contrast = 0
+frost.Parent = Lighting
+
+TweenService:Create(
+	frost,
+	TweenInfo.new(10),
+	{
+		TintColor = Color3.fromRGB(0, 0, 255),
+		Saturation = -0.7,
+		Contrast = 0.2
+	}
+):Play()
+
+local function getRoom()
+	local rooms = workspace:FindFirstChild("CurrentRooms")
+
+	if not rooms then
+		return nil
+	end
+
+	return rooms:FindFirstChild(tostring(LatestRoom.Value))
+end
+
+local function createColdBar()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "FrostbiteColdGui"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 100000
+	gui.Parent = playerGui
+
+	local container = Instance.new("Frame")
+	container.Name = "StaminaStyleBar"
+	container.Size = UDim2.new(0.34, 20, 0.05, 10)
+	container.Position = UDim2.new(0.5, 0, 0.86, 0)
+	container.AnchorPoint = Vector2.new(0.5, 0.5)
+	container.BackgroundTransparency = 1
+	container.Parent = gui
+
+	local outerBar = Instance.new("Frame")
+	outerBar.Name = "Bar"
+	outerBar.Size = UDim2.new(1, 0, 0.35, 0)
+	outerBar.Position = UDim2.new(0.5, 0, 0.5, 0)
+	outerBar.AnchorPoint = Vector2.new(0.5, 0.5)
+	outerBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	outerBar.BackgroundTransparency = 0.7
+	outerBar.BorderSizePixel = 0
+	outerBar.Parent = container
+
+	local outerCorner = Instance.new("UICorner")
+	outerCorner.CornerRadius = UDim.new(0.25, 0)
+	outerCorner.Parent = outerBar
+
+	local outerStroke = Instance.new("UIStroke")
+	outerStroke.Color = Color3.fromRGB(255, 255, 255)
+	outerStroke.Thickness = 3
+	outerStroke.Parent = outerBar
+
+	local inner = Instance.new("Frame")
+	inner.Name = "Cold"
+	inner.Size = UDim2.new(1, -6, 1, -6)
+	inner.Position = UDim2.new(0, 3, 0, 3)
+	inner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	inner.BorderSizePixel = 0
+	inner.Parent = outerBar
+
+	local innerCorner = Instance.new("UICorner")
+	innerCorner.CornerRadius = UDim.new(0.25, 0)
+	innerCorner.Parent = inner
+
+	return gui, inner
+end
+
+local coldGui, coldBar = createColdBar()
+
+local cold = 1
+local maxCold = 1
+
+local function updateColdBar()
+	cold = math.clamp(cold, 0, maxCold)
+
+	coldBar.Size = UDim2.new(
+		cold / maxCold,
+		0,
+		1,
+		0
+	)
+end
+
+local function isWarm(character)
+	if not character then
+		return false
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return false
+	end
+
+	local tool = character:FindFirstChildOfClass("Tool")
+
+	if tool then
+		if tool:GetAttribute("Enabled") == true
+			or tool:GetAttribute("IsOn") == true
+			or tool:GetAttribute("TurnedOn") == true then
+			return true
+		end
+
+		for _, object in ipairs(tool:GetDescendants()) do
+			if (
+				object:IsA("PointLight")
+				or object:IsA("SpotLight")
+				or object:IsA("SurfaceLight")
+			) and object.Enabled then
+				return true
+			end
+
+			if object:IsA("Fire") and object.Enabled then
+				return true
+			end
+
+			if object:IsA("ParticleEmitter") and object.Enabled then
+				local name = object.Name:lower()
+
+				if name:find("fire")
+					or name:find("flame")
+					or name:find("light") then
+					return true
+				end
+			end
+		end
+	end
+
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+	overlapParams.FilterDescendantsInstances = {
+		character
+	}
+
+	local nearbyParts = workspace:GetPartBoundsInRadius(
+		root.Position,
+		15,
+		overlapParams
+	)
+
+	for _, part in ipairs(nearbyParts) do
+
+		for _, object in ipairs(part:GetDescendants()) do
+			if (
+				object:IsA("PointLight")
+				or object:IsA("SpotLight")
+				or object:IsA("SurfaceLight")
+			) and object.Enabled then
+				return true
+			end
+
+			if object:IsA("Fire") and object.Enabled then
+				return true
+			end
+		end
+
+		local name = part.Name:lower()
+
+		if name:find("fireplace")
+			or name:find("campfire")
+			or name:find("candle")
+			or name:find("heater")
+			or name:find("lamp") then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function setDeathCause()
+	local stats = ReplicatedStorage:FindFirstChild("GameStats")
+
+	if not stats then
+		return
+	end
+
+	local playerStats = stats:FindFirstChild(
+		"Player_" .. player.Name
+	)
+
+	if not playerStats then
+		return
+	end
+
+	local total = playerStats:FindFirstChild("Total")
+
+	if not total then
+		return
+	end
+
+	local deathCause = total:FindFirstChild("DeathCause")
+
+	if deathCause then
+		deathCause.Value = "Frostbite"
+	end
+end
+
+local function cameraShake()
+	local camera = workspace.CurrentCamera
+	local CameraShaker = ReplicatedStorage:FindFirstChild("CameraShaker")
+
+	if not CameraShaker then
+		return
+	end
+
+	task.spawn(function()
+		local success, module = pcall(function()
+			return require(CameraShaker)
+		end)
+
+		if not success or not module then
+			return
+		end
+
+		local shake = module.new(
+			Enum.RenderPriority.Camera.Value,
+			function(cf)
+				if camera then
+					camera.CFrame = camera.CFrame * cf
+				end
+			end
+		)
+
+		shake:Start()
+
+		shake:ShakeOnce(
+			8,
+			8,
+			0.5,
+			4
+		)
+	end)
+end
+
+for _ = 1, Random.new():NextInteger(4, 10) do
+
+	local room = getRoom()
+
+	if not room then
+		break
+	end
+
+	local frostbite = modelTemplate:Clone()
+	frostbite.Name = "Frostyma5n"
+	frostbite.Parent = workspace
+
+	local primary =
+		frostbite.PrimaryPart
+		or frostbite:FindFirstChildWhichIsA(
+			"BasePart",
+			true
+		)
+
+	if not primary then
+		frostbite:Destroy()
+		break
+	end
+
+	frostbite.PrimaryPart = primary
+
+	for _, object in ipairs(frostbite:GetDescendants()) do
+
+		if object:IsA("BasePart") then
+			object.Anchored = true
+			object.CanCollide = false
+			object.CanTouch = false
+			object.CanQuery = false
+			object.Massless = true
+		end
+
+		if object:IsA("ParticleEmitter") then
+			object.Enabled = true
+		end
+	end
+
+	local entrance = room:FindFirstChild("RoomEntrance")
+
+	if entrance then
+		frostbite:PivotTo(
+			entrance.CFrame * CFrame.new(0, 0, -30)
+		)
+	end
+
+	cameraShake()
+
+	local alive = true
+	local startingRoom = LatestRoom.Value
+
+	local roomConnection
+
+	roomConnection = LatestRoom.Changed:Connect(function(newRoom)
+		if not alive then
+			return
+		end
+
+		if newRoom ~= startingRoom then
+			alive = false
+
+			if roomConnection then
+				roomConnection:Disconnect()
+				roomConnection = nil
+			end
+
+			if frostbite and frostbite.Parent then
+				frostbite:Destroy()
+			end
+		end
+	end)
+
+	task.spawn(function()
+
+		local startTime = os.clock()
+		local damageTimer = 0
+
+		while alive
+			and frostbite
+			and frostbite.Parent do
+
+			local dt = task.wait(0.1)
+			local elapsed = os.clock() - startTime
+
+			local character = player.Character
+
+			local humanoid =
+				character
+				and character:FindFirstChildOfClass(
+					"Humanoid"
+				)
+
+			if humanoid
+				and humanoid.Health > 0
+				and elapsed >= DAMAGE_START_DELAY then
+
+				if not isWarm(character) then
+					cold = math.max(
+						0,
+						cold - COLD_DRAIN_RATE * dt
+					)
+				end
+
+				if cold <= 0 then
+					damageTimer += dt
+
+					if damageTimer >= 1 then
+						damageTimer -= 1
+
+						humanoid.Health = math.max(
+							0,
+							humanoid.Health - DAMAGE_PER_SECOND
+						)
+
+						setDeathCause()
+					end
+				else
+					damageTimer = 0
+				end
+			end
+
+			updateColdBar()
+		end
+	end)
+
+	repeat
+		task.wait(0.1)
+	until not alive
+		or not frostbite
+		or not frostbite.Parent
+
+	alive = false
+
+	if roomConnection then
+		roomConnection:Disconnect()
+		roomConnection = nil
+	end
+
+	if frostbite and frostbite.Parent then
+		frostbite:Destroy()
+	end
+end
+
+if coldGui then
+	coldGui:Destroy()
+end
+
+if frost and frost.Parent then
+
+	local restoreTween = TweenService:Create(
+		frost,
+		TweenInfo.new(2),
+		{
+			TintColor = Color3.fromRGB(255, 255, 255),
+			Saturation = 0,
+			Contrast = 0
+		}
+	)
+
+	restoreTween:Play()
+
+	task.wait(2)
+
+	if frost.Parent then
+		frost:Destroy()
+	end
+end
