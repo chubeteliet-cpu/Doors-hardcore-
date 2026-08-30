@@ -1,0 +1,154 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local client = Players.LocalPlayer
+local ui = client:WaitForChild("PlayerGui")
+
+local energy = 100
+local limit = 100
+local consuming = false
+local locked = false
+
+local consumeRate = 18
+local restoreRate = 20
+
+local mainGui = Instance.new("ScreenGui")
+mainGui.Name = "SprintDisplay"
+mainGui.IgnoreGuiInset = true
+mainGui.ResetOnSpawn = false
+mainGui.Parent = ui
+
+local base = Instance.new("Frame")
+base.Size = UDim2.new(0.25, 0, 0.05, 10)
+base.Position = UDim2.new(0.72, 0, 0.97, 0)
+base.AnchorPoint = Vector2.new(0, 1)
+base.BackgroundTransparency = 1
+base.ZIndex = 1005
+base.Parent = mainGui
+
+local inset = Instance.new("UIPadding")
+inset.PaddingLeft = UDim.new(0.1, 0)
+inset.PaddingRight = UDim.new(0.1, 0)
+inset.PaddingTop = UDim.new(0.3, -5)
+inset.PaddingBottom = UDim.new(0.3, -5)
+inset.Parent = base
+
+local track = Instance.new("Frame")
+track.Size = UDim2.new(1, 0, 0.35, 0)
+track.Position = UDim2.fromScale(0.5, 0.5)
+track.AnchorPoint = Vector2.new(0.5, 0.5)
+track.BackgroundColor3 = Color3.new(1, 1, 1)
+track.BackgroundTransparency = 0.7
+track.BorderColor3 = Color3.fromRGB(27, 27, 27)
+track.ZIndex = 1005
+track.Parent = base
+
+local trackRound = Instance.new("UICorner")
+trackRound.CornerRadius = UDim.new(0.25, 0)
+trackRound.Parent = track
+
+local trackInset = Instance.new("UIPadding")
+trackInset.PaddingLeft = UDim.new(0, 3)
+trackInset.PaddingRight = UDim.new(0, 3)
+trackInset.PaddingTop = UDim.new(0, 3)
+trackInset.PaddingBottom = UDim.new(0, 3)
+trackInset.Parent = track
+
+local outline = Instance.new("UIStroke")
+outline.Color = Color3.new(1, 1, 1)
+outline.Thickness = 4
+outline.Parent = track
+
+local meter = Instance.new("Frame")
+meter.Size = UDim2.fromScale(1, 1)
+meter.BackgroundColor3 = Color3.new(1, 1, 1)
+meter.BorderSizePixel = 0
+meter.ZIndex = 1006
+meter.Parent = track
+
+local meterRound = Instance.new("UICorner")
+meterRound.CornerRadius = UDim.new(0.25, 0)
+meterRound.Parent = meter
+
+local controls = Instance.new("ScreenGui")
+controls.Name = "SprintControls"
+controls.ResetOnSpawn = false
+controls.Parent = ui
+
+local toggle = Instance.new("ImageButton")
+toggle.Name = "Sprint"
+toggle.Size = UDim2.fromOffset(85, 85)
+toggle.Position = UDim2.new(1, -115, 1, -190)
+toggle.BackgroundTransparency = 1
+toggle.BorderSizePixel = 0
+toggle.AutoButtonColor = false
+toggle.Image = "rbxassetid://89076979252444"
+toggle.Parent = controls
+
+local ratio = Instance.new("UIAspectRatioConstraint")
+ratio.AspectRatio = 1
+ratio.Parent = toggle
+
+local round = Instance.new("UICorner")
+round.CornerRadius = UDim.new(1, 0)
+round.Parent = toggle
+
+local edge = Instance.new("UIStroke")
+edge.Color = Color3.new(1, 1, 1)
+edge.Thickness = 1
+edge.Transparency = 0.35
+edge.Parent = toggle
+
+local function setBoost(amount)
+	local character = client.Character
+	if character then
+		character:SetAttribute("SpeedBoost", amount)
+	end
+end
+
+local function showExhausted()
+	local root = ui:FindFirstChild("MainUI")
+	local init = root and root:FindFirstChild("Initiator")
+	local module = init and init:FindFirstChild("Main_Game")
+
+	if module then
+		local ok, gameModule = pcall(require, module)
+		if ok and gameModule.caption then
+			gameModule.caption("You're exhausted", true)
+		end
+	end
+end
+
+toggle.MouseButton1Click:Connect(function()
+	if locked or energy <= 0 then
+		return
+	end
+
+	consuming = not consuming
+	setBoost(consuming and 5 or 0)
+end)
+
+RunService.Heartbeat:Connect(function(step)
+	if consuming then
+		energy -= consumeRate * step
+
+		if energy <= 0 then
+			energy = 0
+			consuming = false
+			locked = true
+
+			setBoost(0)
+			showExhausted()
+		end
+	else
+		energy += restoreRate * step
+
+		if energy >= limit then
+			energy = limit
+			locked = false
+		end
+	end
+
+	energy = math.clamp(energy, 0, limit)
+	meter.Size = UDim2.new(energy / limit, 0, 1, 0)
+end)
